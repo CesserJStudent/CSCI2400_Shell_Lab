@@ -57,7 +57,7 @@ int main(int argc, char **argv)
   // Redirect stderr to stdout (so that driver will get all output
   // on the pipe connected to stdout)
   //
-  dup2(1, 2);
+  dup2(1, 2); 
 
   /* Parse the command line */
   char c;
@@ -179,15 +179,18 @@ void eval(char *cmdline)
 //
 int builtin_cmd(char **argv) 
 {
-  string cmd(argv[0]);
-
-  if(strngcmp(argv[0], "quit"){
-	quit;
+  if (!strcmp(argv[0], "quit")){ /*quit command*/
+	exit(0);
+	}		
+  else if (!strcmp(argv[0], "&")){
+	return 1;	/* returning 1 when built in command "should" prompt the program to run in the background */
 	}
-  if else(
-	
-  return 0;     /* not a builtin command */
-}
+  else if (!strcmp(argv[0], "jobs")){
+	listjobs(jobs);
+	return 1;
+	}				
+  return 0;     /* not a builtin command */ /*If builtin_cmd returns 0, the shell creates a child process and executres the requested program inside the child. */
+}		/*if the user has reuqested for the program to run in the background, then the shell returns to the top of the loop and waits for the next cmd line*/
 
 /////////////////////////////////////////////////////////////////////////////
 //
