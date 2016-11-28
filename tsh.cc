@@ -146,6 +146,7 @@ int main(int argc, char **argv)
 // background children don't receive SIGINT (SIGTSTP) from the kernel
 // when we type ctrl-c (ctrl-z) at the keyboard.
 //
+
 void eval(char *cmdline) 
 {
   /* Parse command line */
@@ -154,24 +155,19 @@ void eval(char *cmdline)
   // routine below. It provides the arguments needed
   // for the execve() routine, which you'll need to
   // use below to launch a process.
-  //
+  
   char *argv[MAXARGS];
-	char buf[MAZLINE]; //holds modified command line
-	int bg //will tell us if we should put job in bg or fg
-	pid_t pid; //id of the process
-	
-	
-  //
+
+  
   // The 'bg' variable is TRUE if the job should run
   // in background mode or FALSE if it should run in FG
-  //
-  bg = parseline(cmdline, argv); 
+  
+  int bg = parseline(cmdline, argv); 
   if (argv[0] == NULL)  
     return;   /* ignore empty lines */
 
   return;
 }
-
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -252,7 +248,7 @@ void waitfg(pid_t pid)
 {
 	struct job_t *z;
 	z = getjobpid(jobs, pid);
-	while (z->state == FG);
+	while (z->state == FG){
 	sleep (1);
 	}
   return;
