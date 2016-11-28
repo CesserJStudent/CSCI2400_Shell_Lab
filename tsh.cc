@@ -155,19 +155,26 @@ void eval(char *cmdline)
   // routine below. It provides the arguments needed
   // for the execve() routine, which you'll need to
   // use below to launch a process.
-  
-  char *argv[MAXARGS];
-
-  
   // The 'bg' variable is TRUE if the job should run
   // in background mode or FALSE if it should run in FG
-  
-  int bg = parseline(cmdline, argv); 
-  if (argv[0] == NULL)  
-    return;   /* ignore empty lines */
-
-  return;
-}
+	char *argv[MAXARGS];
+	int bg = parseline(cmdline, argv); //returns true if bg job, false if foreground job
+	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
+		if(fork() == 0){ //if the return value of the fork is 0, it tells us that we are within the child process
+			if (execv(argv[0], argv) < 0){	//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
+			printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
+			exit(0);		
+			}; 
+		}
+		if(!bg){ //if not bg is false, we are in the parent process
+		wait(NULL);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
+		}
+	}		
+	if (argv[0] == NULL){  
+	 	return;   /* ignore empty lines */
+		}
+	  return;
+	}
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -179,11 +186,12 @@ void eval(char *cmdline)
 //
 int builtin_cmd(char **argv) 
 {
-  if (!strcmp(argv[0], "quit")){ /*quit command*/
+  if (!strcmp(argv[0], "quit")){ /*quit command*/ //so if strcmpr returns 0, the command is quit, which is why I used the "!"
 	exit(0);
 	}		
-  else if (!strcmp(argv[0], "&")){
-	return 1;	/* returning 1 when built in command "should" prompt the program to run in the background */
+  else if (!strcmp(argv[0], "&")){ //will return 0 if argv[0] is "&"
+	listjobs(jobs);
+	return 1;	/* returning 1 when built in command should prompt the program to run in the background */
 	}
   else if (!strcmp(argv[0], "jobs")){
 	listjobs(jobs);
