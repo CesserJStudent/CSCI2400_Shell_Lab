@@ -186,14 +186,14 @@ void eval(char *cmdline)
 //
 int builtin_cmd(char **argv) 
 {
-  if (!strcmp(argv[0], "quit")){ /*quit command*/ //so if strcmpr returns 0, the command is quit, which is why I used the "!"
+  string cmd(argv[0]); //same command as used in do_bgfg, will make it so we dont have to strcmpr for every if statement
+  if (cmd == "quit"){ /*quit command*/
 	exit(0);
 	}		
-  else if (!strcmp(argv[0], "&")){ //will return 0 if argv[0] is "&"
-	listjobs(jobs);
+  else if (cmd == "&"){ //will return 0 if argv[0] is "&"
 	return 1;	/* returning 1 when built in command should prompt the program to run in the background */
 	}
-  else if (!strcmp(argv[0], "jobs")){
+  else if (cmd == "jobs"){
 	listjobs(jobs);
 	return 1;
 	}				
@@ -278,7 +278,7 @@ void waitfg(pid_t pid)
 //
 void sigchld_handler(int sig) 
 {
-  return;
+	
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -289,7 +289,7 @@ void sigchld_handler(int sig)
 //
 void sigint_handler(int sig) 
 {
-  return;
+	
 }
 
 /////////////////////////////////////////////////////////////////////////////
