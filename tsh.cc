@@ -159,6 +159,10 @@ void eval(char *cmdline)
   // in background mode or FALSE if it should run in FG
 	char *argv[MAXARGS];
 	int bg = parseline(cmdline, argv); //returns true if bg job, false if foreground job
+	pid_t pid;
+	pid = getpid();
+	job_t *jobid;
+
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
 		if(fork() == 0){ //if the return value of the fork is 0, it tells us that we are within the child process
 			if (execv(argv[0], argv) < 0){	//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
@@ -167,7 +171,13 @@ void eval(char *cmdline)
 			}; 
 		}
 		if(!bg){ //if not bg is false, we are in the parent process
-		wait(NULL);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
+		addjob(jobs, pid, FG, cmdline); //add job to the struct with the foreground state
+		waitfg(pid);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
+		}
+		else if(bg){
+			addjob(jobs, pid, BG, cmdline); //add job to the struct with the background state
+			jobid = getjobpid(jobs, pid);	//get job id of recently added job
+			printf("[%d] (%d) %s", jobid->jid, pid, cmdline);
 		}
 	}		
 	if (argv[0] == NULL){  
@@ -190,11 +200,12 @@ int builtin_cmd(char **argv)
   if (cmd == "quit"){ /*quit command*/
 	exit(0);
 	}		
-  else if (cmd == "&"){ //will return 0 if argv[0] is "&"
+  /*else if (cmd == "&"){ //will return 0 if argv[0] is "&"
+  	//printf("[%d] (%d) ", jobs[pid].jid, jobs[pid].pid);	
 	return 1;	/* returning 1 when built in command should prompt the program to run in the background */
-	}
+	//}
   else if (cmd == "jobs"){
-	listjobs(jobs);
+	listjobs(jobs); //call list jobs function from jobs.cc
 	return 1;
 	}				
   return 0;     /* not a builtin command */ /*If builtin_cmd returns 0, the shell creates a child process and executres the requested program inside the child. */
