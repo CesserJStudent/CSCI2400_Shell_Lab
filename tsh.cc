@@ -162,24 +162,27 @@ void eval(char *cmdline)
 	pid_t pid;
 	pid = getpid();
 	job_t *jobid;
-
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
+		
 		if(fork() == 0){ //if the return value of the fork is 0, it tells us that we are within the child process
 			if (execv(argv[0], argv) < 0){	//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
 			printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
 			exit(0);		
 			}; 
 		}
-		if(!bg){ //if not bg is false, we are in the parent process
-		addjob(jobs, pid, FG, cmdline); //add job to the struct with the foreground state
-		waitfg(pid);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
-		}
-		else if(bg){
-			addjob(jobs, pid, BG, cmdline); //add job to the struct with the background state
-			jobid = getjobpid(jobs, pid);	//get job id of recently added job
-			printf("[%d] (%d) %s", jobid->jid, pid, cmdline);
-		}
-	}		
+		else{ //if parent
+			addjob(jobs, pid, BG, cmdline);
+			if(!bg){ //if not bg is false, we are in the parent process
+				addjob(jobs, pid, FG, cmdline); //add job to the struct with the foreground state
+				waitfg(pid);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
+					}
+			else{
+				addjob(jobs, pid, BG, cmdline); //add job to the struct with the background state
+				jobid = getjobpid(jobs, pid);	//get job id of recently added job
+				printf("[%d] (%d) %s", jobid->jid, pid, cmdline);
+			}
+		}	
+	}	
 	if (argv[0] == NULL){  
 	 	return;   /* ignore empty lines */
 		}
@@ -317,7 +320,3 @@ void sigtstp_handler(int sig)
 /*********************
  * End signal handlers
  *********************/
-
-
-
-
