@@ -166,12 +166,11 @@ void eval(char *cmdline)
 		
 		if(fork() == 0){ //if the return value of the fork is 0, it tells us that we are within the child process
 			if (execv(argv[0], argv) < 0){	//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
-			printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
-			exit(0);		
+				printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
+				exit(0);		
 			}; 
 		}
 		else{ //if parent
-			addjob(jobs, pid, BG, cmdline);
 			if(!bg){ //if not bg is false, we are in the parent process
 				addjob(jobs, pid, FG, cmdline); //add job to the struct with the foreground state
 				waitfg(pid);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
@@ -203,10 +202,10 @@ int builtin_cmd(char **argv)
   if (cmd == "quit"){ /*quit command*/
 	exit(0);
 	}		
-  /*else if (cmd == "&"){ //will return 0 if argv[0] is "&"
-  	//printf("[%d] (%d) ", jobs[pid].jid, jobs[pid].pid);	
-	return 1;	/* returning 1 when built in command should prompt the program to run in the background */
-	//}
+  else if (cmd == "&"){ 
+  		
+	return 1;	
+	}
   else if (cmd == "jobs"){
 	listjobs(jobs); //call list jobs function from jobs.cc
 	return 1;
@@ -268,10 +267,8 @@ void do_bgfg(char **argv)
 //
 void waitfg(pid_t pid)
 {
-	struct job_t *z;
-	z = getjobpid(jobs, pid);
-	while (z->state == FG){
-	sleep (1);
+	while(pid == fgpid(jobs)){
+		sleep(1);
 	}
   return;
 }
