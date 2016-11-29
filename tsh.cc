@@ -164,17 +164,17 @@ void eval(char *cmdline)
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
 		pid = fork();
 		if(pid == 0){ 		//if the return value of the fork is 0, it tells us that we are within the child process
-			execv(argv[0], argv);					//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
+			execv(argv[0], argv); //this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
 			printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
 			exit(0);		 
 		}		
-		else{ 				//if parent			
+		else{ //if parent			
 			if(!bg){ //will execute if we are in the an FG process (bg is false)	
-				addjob(jobs, pid, FG, cmdline);			
+				addjob(jobs, pid, FG, cmdline);	//add job to struct with fg state		
 				 waitfg(pid); //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
 					}
 			else{
-				addjob(jobs, pid, BG, cmdline);
+				addjob(jobs, pid, BG, cmdline); //add job to struct with bg state
 				job = getjobpid(jobs, pid);	//get job id of recently added job
 				printf("[%d] (%d) %s", job->jid, pid, cmdline);
 			}
@@ -264,11 +264,7 @@ void do_bgfg(char **argv)
 //
 void waitfg(pid_t pid)
 {
-	/*job_t *job = getjobpid(jobs, pid);
-	while(job->state == FG){
-		sleep(1);
-	}*/
-	while(pid == fgpid(jobs)){
+	while(pid == fgpid(jobs)){ //while the pid is equal to an fg pid, don't do anything. when it is not a fg pid stop sleeping 
 		sleep(1);
 	}
   return;
@@ -288,14 +284,20 @@ void waitfg(pid_t pid)
 //     available zombie children, but doesn't wait for any other
 //     currently running children to terminate.  
 //
-void sigchld_handler(int sig) 
+void sigchld_handler(int sig) //signal tells us there is a child and we need to wait until that child is done executing, so use waitpid function
 {
-	pid_t pid;
-	int childstatus;
-	while((pid = waitpid(-1, &childstatus, WNOHANG)) > 0){		
-		deletejob(jobs, pid);
-	}
-	return;
+	int status; //location where waitpid can store a status value, if value is zero child process returns zero, otherwise it can be analyzed
+	pid_t pid;	//specifies the child processes the caller wants to wait for
+				//if pid is -1, waitpid() waits for any child process to end, so this will let any child processes end before reaping them
+				//WNOHANG checks child processes without causing the caller to be suspended
+	//when using WHNOHANG and there is at least one process (usually a child) whose status information is not available, waitpid returns 0
+	// because if this we need our waitpid function to return a value greater than zero before we delete/reap that child.
+	// http://www.ibm.com/support/knowledgecenter/SSLTBW_2.1.0/com.ibm.zos.v2r1.bpxbd00/rtwaip.htm for refresher
+	if((pid = waitpid(-1, &status, WNOHANG)) > 0){		
+ 		deletejob(jobs, pid);
+ 		}		
+	return; 
+												
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -306,7 +308,13 @@ void sigchld_handler(int sig)
 //
 void sigint_handler(int sig) 
 {
-	
+	pid_t pid = fgpid(jobs);
+	if (pid > 0){ //must be greater than zero to be a fg job, 0 means no fg process found
+		kill(-pid, sig); //kill the process - this is the default action for sigint
+		struct job_t *job = getjobpid(jobs, pid); //used for print statement
+		printf("Job [%d] (%d) terminated by signal %d\n", job->jid, pid, (sig));
+	}
+	return;
 }
 
 /////////////////////////////////////////////////////////////////////////////
