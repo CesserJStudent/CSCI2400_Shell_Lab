@@ -163,10 +163,11 @@ void eval(char *cmdline)
 	struct job_t *job;
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
 		pid = fork();
+		setpgid(0,0); //set group id for all fg processes so bg processes do not associate with fg processes
 		if(pid == 0){ 		//if the return value of the fork is 0, it tells us that we are within the child process
 			execv(argv[0], argv); //this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
-			printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
-			exit(0);		 
+			printf("%s: Command not found\n", argv[0]);//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
+			exit(0); //this will never return unless the command is a bogus command, which is why I have cmdnotfound print		 
 		}		
 		else{ //if parent			
 			if(!bg){ //will execute if we are in the an FG process (bg is false)	
@@ -196,14 +197,15 @@ void eval(char *cmdline)
 //
 int builtin_cmd(char **argv) 
 {
-  string cmd(argv[0]); //same command as used in do_bgfg, will make it so we dont have to strcmpr for every if statement
-  if (cmd == "quit"){ /*quit command*/
+  string input(argv[0]); //same cmd as used in do_bgfg, will make it so we dont have to strcmpr for every if statement
+  if (input == "quit"){ /*quit command*/
 	exit(0);
 	}		
-  else if (cmd == "&"){ 
-	return 1;	
-	}
-  else if (cmd == "jobs"){
+  else if((strcmp(argv[0],"bg")) == 0 || (strcmp(argv[0],"fg") == 0)){
+  	do_bgfg(argv);
+  	return 1;
+  }
+  else if (input == "jobs"){
 	listjobs(jobs); //call list jobs function from jobs.cc
 	return 1;
 	}				
@@ -254,7 +256,16 @@ void do_bgfg(char **argv)
   // your benefit.
   //
   string cmd(argv[0]);
-
+  if((strcmp(argv[0],"bg")) == 0)  {
+  	jobp->state = BG; //changes the state to bg
+  	kill(-jobp->pid, SIGCONT); //tells the system to run the job again
+  	printf("[%d] (%d) %s", jobp->jid, jobp->pid, jobp->cmdline);
+  }
+  if((strcmp(argv[0],"fg")) == 0)  {
+  	jobp->state = FG; //changes the state to bg
+  	kill(-jobp->pid, SIGCONT); //tells the system to run the job again
+  	waitfg(jobp->pid); //we need this waitfg because we need to have only one fg process running at a time
+  }
   return;
 }
 
@@ -293,8 +304,17 @@ void sigchld_handler(int sig) //signal tells us there is a child and we need to 
 	//when using WHNOHANG and there is at least one process (usually a child) whose status information is not available, waitpid returns 0
 	// because if this we need our waitpid function to return a value greater than zero before we delete/reap that child.
 	// http://www.ibm.com/support/knowledgecenter/SSLTBW_2.1.0/com.ibm.zos.v2r1.bpxbd00/rtwaip.htm for refresher
-	if((pid = waitpid(-1, &status, WNOHANG)) > 0){		
+	while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0){
+		//WUNTRACED	is for non terminated processes (stopped processes)
+		if(WIFSTOPPED(status)){ //if the process is stopped, do nothing. WIFSTOPPED returns true if child is currently stopped
+			return;
+		}
+		else if(WIFSIGNALED(status)){
+			deletejob(jobs, pid);
+		}
+		else{		
  		deletejob(jobs, pid);
+ 			}
  		}		
 	return; 
 												
@@ -325,6 +345,13 @@ void sigint_handler(int sig)
 //
 void sigtstp_handler(int sig) 
 {
+  pid_t pid = fgpid(jobs);
+  if(pid > 0){
+  	kill(-pid, sig);
+  	struct job_t *job = getjobpid(jobs, pid); //used for print statement
+  	job->state = ST;
+	printf("Job [%d] (%d) stopped by signal %d\n", job->jid, pid, (sig));
+  }
   return;
 }
 
