@@ -160,25 +160,23 @@ void eval(char *cmdline)
 	char *argv[MAXARGS];
 	int bg = parseline(cmdline, argv); //returns true if bg job, false if foreground job
 	pid_t pid;
-	pid = getpid();
-	job_t *jobid;
+	struct job_t *job;
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
-		
-		if(fork() == 0){ //if the return value of the fork is 0, it tells us that we are within the child process
-			if (execv(argv[0], argv) < 0){	//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
-				printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
-				exit(0);		
-			}; 
-		}
-		else{ //if parent
-			if(!bg){ //if not bg is false, we are in the parent process
-				addjob(jobs, pid, FG, cmdline); //add job to the struct with the foreground state
-				waitfg(pid);  //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
+		pid = fork();
+		if(pid == 0){ 		//if the return value of the fork is 0, it tells us that we are within the child process
+			execv(argv[0], argv);					//this fork creates the child process, more specifically execv replaces currently executing program with newly loaded program image, PID unchanged
+			printf("Command not found\n");	//but if the command entered is not found, when we exec it, it will give us a negative value if the command is not found, if that is the case we need to exit so we don't end up running multiple instances of our shell.
+			exit(0);		 
+		}		
+		else{ 				//if parent			
+			if(!bg){ //will execute if we are in the an FG process (bg is false)	
+				addjob(jobs, pid, FG, cmdline);			
+				 waitfg(pid); //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
 					}
 			else{
-				addjob(jobs, pid, BG, cmdline); //add job to the struct with the background state
-				jobid = getjobpid(jobs, pid);	//get job id of recently added job
-				printf("[%d] (%d) %s", jobid->jid, pid, cmdline);
+				addjob(jobs, pid, BG, cmdline);
+				job = getjobpid(jobs, pid);	//get job id of recently added job
+				printf("[%d] (%d) %s", job->jid, pid, cmdline);
 			}
 		}	
 	}	
@@ -203,7 +201,6 @@ int builtin_cmd(char **argv)
 	exit(0);
 	}		
   else if (cmd == "&"){ 
-  		
 	return 1;	
 	}
   else if (cmd == "jobs"){
@@ -267,6 +264,10 @@ void do_bgfg(char **argv)
 //
 void waitfg(pid_t pid)
 {
+	/*job_t *job = getjobpid(jobs, pid);
+	while(job->state == FG){
+		sleep(1);
+	}*/
 	while(pid == fgpid(jobs)){
 		sleep(1);
 	}
@@ -289,7 +290,12 @@ void waitfg(pid_t pid)
 //
 void sigchld_handler(int sig) 
 {
-	
+	pid_t pid;
+	int childstatus;
+	while((pid = waitpid(-1, &childstatus, WNOHANG)) > 0){		
+		deletejob(jobs, pid);
+	}
+	return;
 }
 
 /////////////////////////////////////////////////////////////////////////////
