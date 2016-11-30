@@ -276,7 +276,7 @@ void do_bgfg(char **argv)
 void waitfg(pid_t pid)
 {
 	while(pid == fgpid(jobs)){ //while the pid is equal to an fg pid, don't do anything. when it is not a fg pid stop sleeping 
-		sleep(1);
+		sleep(.1);
 	}
   return;
 }
@@ -306,14 +306,19 @@ void sigchld_handler(int sig) //signal tells us there is a child and we need to 
 	// http://www.ibm.com/support/knowledgecenter/SSLTBW_2.1.0/com.ibm.zos.v2r1.bpxbd00/rtwaip.htm for refresher
 	while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0){
 		//WUNTRACED	is for non terminated processes (stopped processes)
-		if(WIFSTOPPED(status)){ //if the process is stopped, do nothing. WIFSTOPPED returns true if child is currently stopped
+		if(WIFSTOPPED(status)){ //if the process is stopped, do nothing except change the state to stopped. WIFSTOPPED returns true if child is currently stopped
+			struct job_t *job = getjobpid(jobs, pid); //used for print statement
+  			job->state = ST;
+			printf("Job [%d] (%d) stopped by signal 20\n", job->jid, pid);
 			return;
 		}
-		else if(WIFSIGNALED(status)){
+		else if(WIFSIGNALED(status)){ //catches ctrl-c, the interupt signal which has a default action of terminate
+			struct job_t *job = getjobpid(jobs, pid); //used for print statement
+			printf("Job [%d] (%d) terminated by signal 2\n", job->jid, pid);
 			deletejob(jobs, pid);
 		}
 		else{		
- 		deletejob(jobs, pid);
+ 			deletejob(jobs, pid);
  			}
  		}		
 	return; 
@@ -331,8 +336,6 @@ void sigint_handler(int sig)
 	pid_t pid = fgpid(jobs);
 	if (pid > 0){ //must be greater than zero to be a fg job, 0 means no fg process found
 		kill(-pid, sig); //kill the process - this is the default action for sigint
-		struct job_t *job = getjobpid(jobs, pid); //used for print statement
-		printf("Job [%d] (%d) terminated by signal %d\n", job->jid, pid, (sig));
 	}
 	return;
 }
@@ -348,9 +351,6 @@ void sigtstp_handler(int sig)
   pid_t pid = fgpid(jobs);
   if(pid > 0){
   	kill(-pid, sig);
-  	struct job_t *job = getjobpid(jobs, pid); //used for print statement
-  	job->state = ST;
-	printf("Job [%d] (%d) stopped by signal %d\n", job->jid, pid, (sig));
   }
   return;
 }
