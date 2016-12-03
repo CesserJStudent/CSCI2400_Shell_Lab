@@ -161,7 +161,9 @@ void eval(char *cmdline)
 	int bg = parseline(cmdline, argv); //returns true if bg job, false if foreground job
 	pid_t pid;
 	struct job_t *job;
+	sigset_t masker;
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
+		sigprocmask(SIG_BLOCK, &masker, 0); //blocks SIGCHLD singals before forking and will be unblocked after addjob is called.
 		pid = fork();
 		setpgid(0,0); //set group id for all fg processes so bg processes do not associate with fg processes
 		if(pid == 0){ 		//if the return value of the fork is 0, it tells us that we are within the child process
@@ -170,12 +172,14 @@ void eval(char *cmdline)
 			exit(0); //this will never return unless the command is a bogus command, which is why I have cmdnotfound print		 
 		}		
 		else{ //if parent			
-			if(!bg){ //will execute if we are in the an FG process (bg is false)	
-				addjob(jobs, pid, FG, cmdline);	//add job to struct with fg state		
-				 waitfg(pid); //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
+			if(!bg){ //will execute if we are in the an FG process (bg is false)
+				addjob(jobs, pid, FG, cmdline);	//add job to struct with fg state
+				sigprocmask(SIG_UNBLOCK, &masker, 0); //unblocks the signals we blocked before add jobs
+				waitfg(pid); //this makes the parent process wait for the child process and reap it, so we don't get zombies/defunct processes	
 					}
 			else{
 				addjob(jobs, pid, BG, cmdline); //add job to struct with bg state
+				sigprocmask(SIG_UNBLOCK, &masker, 0);//unblocks the signals we blocked before add jobs
 				job = getjobpid(jobs, pid);	//get job id of recently added job
 				printf("[%d] (%d) %s", job->jid, pid, cmdline);
 			}
