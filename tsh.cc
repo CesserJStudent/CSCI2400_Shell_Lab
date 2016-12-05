@@ -163,7 +163,7 @@ void eval(char *cmdline)
 	struct job_t *job;
 	sigset_t masker;
 	if (!builtin_cmd(argv)){//if it is not a builtin_cmd, we need to fork and exec a child process, if it is a builtin_cmd we will process it with our builtin_cmd function	
-		//sigprocmask(SIG_BLOCK, &masker, 0); //blocks SIGCHLD singals before forking and will be unblocked after addjob is called.
+		sigprocmask(SIG_BLOCK, &masker, 0); //blocks SIGCHLD singals before forking and will be unblocked after addjob is called.
 		pid = fork();
 		setpgid(0,0); //set group id for all fg processes so bg processes do not associate with fg processes
 		if(pid == 0){ 		//if the return value of the fork is 0, it tells us that we are within the child process
